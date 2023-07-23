@@ -11,9 +11,12 @@ end
 module State (S : sig type t end) : STATE with type t = S.t = struct
   open Effect.Deep
   type t = S.t
-  type box = { f: t -> t}
+  (* Box the state function inside an environment.
+     Otherwise the type checker infers the functino to be less general
+     than it actually is.*)
+  type env = { f: t -> t}
   type _ Effect.t += Get : t Effect.t | Set : t -> unit Effect.t
-
+  
   let get () = perform Get
   let set v = perform (Set v)
   let make_env (comp : unit -> t) =
@@ -24,16 +27,16 @@ module State (S : sig type t end) : STATE with type t = S.t = struct
           match eff with
           (* Continue with current state,
              and return function with same state *)
-          | Get -> Some (fun (k : (b, box) continuation) ->
+          | Get -> Some (fun (k : (b, env) continuation) ->
                        { f = fun x ->
-                             let box = (continue k x) in
-                             box.f x
+                             let env = (continue k x) in
+                             env.f x
                      })
           (* Continue with unit, and return function with new state *)
           | Set v -> Some (fun (k : (b,_) continuation) ->
                          { f = fun _ ->
-                               let box = (continue k ()) in
-                               box.f v
+                               let env = (continue k ()) in
+                               env.f v
                        })
           | _ -> None
         );
