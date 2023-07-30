@@ -12,7 +12,7 @@ module State (S : sig type t end) : STATE with type t = S.t = struct
   open Effect.Deep
   type t = S.t
   (* Box the state function inside an environment.
-     Otherwise the type checker infers the functino to be less general
+     Otherwise the type checker infers the function to be less general
      than it actually is.*)
   type env = { f: t -> t}
   type _ Effect.t += Get : t Effect.t | Set : t -> unit Effect.t

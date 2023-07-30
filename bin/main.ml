@@ -1,4 +1,4 @@
 open Ocaml_examples
 
 let () =
-  State.main;
+  Env.main ();
