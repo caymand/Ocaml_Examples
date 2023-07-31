@@ -1,4 +1,5 @@
 open Ocaml_examples
 
 let () =
-  Env.main ();
+  print_string "\nFinal env\n";
+  List.iter (fun x -> x ^ "\n" |> print_string) Env.Env_Example.main;
