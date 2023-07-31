@@ -7,6 +7,10 @@ module type ENV =
     type env = { e : t -> t}
     val runEnv : t monoid -> t -> ('a -> t) -> init:'a -> t
     val ask : unit -> t
+    (* TODO: implement this.
+       The intention is to run a computation in a modified environment.
+       This original environment is then restored.*)
+    val local : (t -> t) -> t
   end
 
 module Env : ENV =
