@@ -10,7 +10,7 @@ module type ENV =
     (* TODO: implement this.
        The intention is to run a computation in a modified environment.
        This original environment is then restored.*)
-    val local : (t -> t) -> t
+    (* val local : (t -> t) -> t *)
   end
 
 module Env : ENV =
