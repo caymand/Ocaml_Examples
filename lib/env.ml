@@ -54,8 +54,8 @@ module Env : ENV =
               | _ -> None
             );
           } in
-      let res = env_builder.e initial_env in
-      res.final_env, res.res
+      let comp = env_builder.e initial_env in
+      comp.final_env, comp.res
       
     let ask () : t = perform Ask
     let local f comp v = perform (Local (f, comp, v))
