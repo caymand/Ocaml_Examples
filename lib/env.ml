@@ -93,9 +93,11 @@ module Env_Example = struct
       2 + x in
     let comp () =
       let r2 = local Fun.id comp2 40 in
-      let _ = local (fun bar -> ["Foo"; "Foo"] <> bar) comp1 () in
-      Printf.printf "Second comp returned: %d\n" r2 in
-      print_endline "First comp returned: ()\n";
+      let _ = Printf.printf "Second comp returned: %d\n" r2 in
+      let _ = local (fun bar -> ["Foo"; "Foo"] <> bar) comp1 () in      
+      let _ = print_endline "First comp returned: ()\n"
+      in ()
+    in
     let (env, _) = withEnv list_monoid ["Bar"] comp ~init:() in
     env
       
