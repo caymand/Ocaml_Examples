@@ -4,10 +4,9 @@ module type ENV =
     open Classes
     
     type t = M.t
-    type env = { e : t -> t}
-    val runEnv : 'a. t monoid -> t -> (unit -> unit) -> init:unit -> t
+    val withEnv : 'a 'b. t monoid -> t -> ('a -> 'b) -> init:'a -> t * 'b
     val ask : unit -> t
-    val local : (t -> t) -> (unit -> unit) -> t
+    val local : (t -> t) -> ('a -> 'b) -> 'a -> 'b
   end
 
 module Env : ENV =
@@ -17,48 +16,49 @@ module Env : ENV =
     open Effect.Deep
     
     type t = M.t
-    type env = {e : t -> t }
+    type 'b res = { final_env : t; res: 'b }
+    type 'b env = { e : t -> 'b res }
     
     type _ Effect.t +=
        | Ask : t Effect.t
-       | Local : ((t->t) * (unit -> unit)) -> t Effect.t
+       | Local : ((t->t) * ('a -> 'b) * 'a) -> 'b Effect.t   
    
     (* Run a computation in an environment and return the final environment.
        It is required that the environment is a monoid.*)
-    (* let rec runEnv : 'a. t monoid -> t -> ('a -> t) -> init:'a -> t = *)
-    (*   fun env_impl initial_env comp ~init ->  *)
-    let rec runEnv (env_impl : t monoid) (initial_env : t) (comp : unit -> unit) ~init =
+    (* let rec withEnv (env_impl : t monoid) (initial_env : t) (comp : 'a -> 'b) ~init = *)
+    let rec withEnv : 'a 'b. t monoid -> t -> ('a -> 'b) -> init:'a -> t * 'b =
+      fun env_impl initial_env comp ~init ->
       let open (val env_impl) in
       let env_builder =
         match_with comp init
-          { retc =
-              (fun _ -> {e = fun _ -> empty () });
+          { retc = (fun x ->
+              { e = (fun _ -> {final_env = empty (); res = x}) });
             exnc = raise;
             effc = (fun (type a) (eff : a Effect.t) ->
               match eff with
               | Ask ->
-                 Some(fun (k : (a, env) continuation) ->
-                     { e =  fun x ->
-                            let env = (continue k x) in
-                            env.e x
+                 Some(fun (k : (a, _) continuation) ->
+                     { e =  (fun x ->                         
+                         (continue k x).e x
+                       )
                      }
                    )
-              | Local (f, comp) ->
+              | Local (f, c, v) ->
                  Some (fun (k: (a, _) continuation) ->
-                     { e =  fun x ->
-                            let _ = runEnv env_impl (f x) comp ~init:() in
-                            let env = (continue k x) in
-                            env.e x
+                     { e =  (fun x ->
+                         let (_, res) = withEnv env_impl (f x) c ~init:v in
+                         (continue k res).e x
+                       )
                      }
                    )
               | _ -> None
             );
           } in
-      env_builder.e initial_env
+      let comp = env_builder.e initial_env in
+      comp.final_env, comp.res
       
     let ask () : t = perform Ask
-    let local f comp =
-      perform (Local (f, comp))
+    let local f comp v = perform (Local (f, comp, v))
       
   end
 
@@ -81,25 +81,25 @@ module Env_Example = struct
     let open Env(List_Monoid) in
     let open List_Monoid in
     let comp1 () =
-      print_string "Starting comp 1\n";
+      print_endline "\nStarting comp 1\n";
       let env = ask () in
-      print_string "comp 1 env: ";
-      let _ = List.iter print_string env in
-      print_string "\nend comp 1\n"; in
-    let comp2 () =
-      print_string "Starting comp 2\n";
+      print_endline "This is my env:";
+      List.iter print_endline env in
+    let comp2 x =
+      print_endline "Starting comp 2\n";
       let env = ask () in
-      print_string "comp 2 env: ";
-      let _ = List.iter print_string env in
-      print_string "\nend comp 2\n"; in
+      print_endline "This is my env:";
+      List.iter print_endline env;
+      2 + x in
     let comp () =
-      print_string "starting comp\n";
-      let _ = comp1 () in
-      let _ = local ((<>) ["bar"]) comp2 in
-      let env = ask () in
-      print_string "final env: ";
-      let _ = List.iter print_string env in
-      print_string "\nend comp\n";
-    in runEnv list_monoid ["foo"] comp ~init:()
+      let r2 = local Fun.id comp2 40 in
+      let _ = Printf.printf "Second comp returned: %d\n" r2 in
+      let _ = local (fun bar -> ["Foo"; "Foo"] <> bar) comp1 () in      
+      let _ = print_endline "First comp returned: ()\n"
+      in ()
+    in
+    let (env, _) = withEnv list_monoid ["Bar"] comp ~init:() in
+    env
+      
 end
   

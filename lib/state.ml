@@ -1,61 +1,54 @@
-open Effect
+module type STATE =
+  functor (M : Classes.MONOID) ->
+  sig
+    open Classes
+    type t = M.t
+    val withState : t monoid -> t -> ('a -> 'b) -> 'a -> 'b * t
+    val get : unit -> t
+    val put : t -> unit                     
+  end
 
-module type STATE = sig
-  type t
-  val get : unit -> t
-  val set : t -> unit
-  val run : (unit -> t) -> init:t -> t
-end
-
-
-module State (S : sig type t end) : STATE with type t = S.t = struct
+module State : STATE =
+  functor (M : Classes.MONOID) ->
+  struct
+  open Classes
+  open Effect
   open Effect.Deep
-  type t = S.t
-  (* Box the state function inside an environment.
-     Otherwise the type checker infers the function to be less general
-     than it actually is.*)
-  type env = { f: t -> t}
-  type _ Effect.t += Get : t Effect.t | Set : t -> unit Effect.t
-  
+
+  type t = M.t
+  type 'a state = { s : t -> 'a * t }
+  type _ Effect.t +=
+     | Get : t Effect.t
+     | Put : t -> unit Effect.t
+     (* | State : (t -> 'a * t) -> unit Effect.t *)
+
+  let put v = perform (Put v)
   let get () = perform Get
-  let set v = perform (Set v)
-  let make_env (comp : unit -> t) =
-    match_with comp ()
-      { retc = (fun x -> {f = fun _ -> x } );
-        exnc = raise;
-        effc = (fun (type b) (eff : b Effect.t) ->
-          match eff with
-          (* Continue with current state,
-             and return function with same state *)
-          | Get -> Some (fun (k : (b, env) continuation) ->
-                       { f = fun x ->
-                             let env = (continue k x) in
-                             env.f x
-                     })
-          (* Continue with unit, and return function with new state *)
-          | Set v -> Some (fun (k : (b,_) continuation) ->
-                         { f = fun _ ->
-                               let env = (continue k ()) in
-                               env.f v
-                       })
-          | _ -> None
-        );
-      }
-  let run f ~init =
-    let boxed_env = make_env f
-    in boxed_env.f init
-end
-
-let main =
-  let open State (struct type t = int end) in
-  let random_comp () =
-    let n = get () in
-    set (n+1);
-    get ()
-  in
-  let result = run random_comp ~init:0
-  in Printf.printf "n: %d\n" result
-
-
-
   
+  let withState (state_mod: t monoid) (init_state : t) (comp : 'a -> 'b) (a : 'a) =
+    let state_builder =
+      let open (val state_mod) in
+      match_with comp a
+        { exnc = raise;
+          retc = (fun r -> { s = fun e -> r, e });
+          effc = (fun (type b) (eff : b Effect.t) ->
+            match eff with
+            | Get ->
+               Some (fun (k : (b, _) continuation) ->
+                   { s = fun x ->
+                         let cur_state = continue k x in
+                         cur_state.s x
+                   }
+                 )
+            | Put v ->
+               Some (fun (k : (b, _) continuation) ->
+                   { s = fun _ ->
+                         let cur_state = continue k () in
+                         cur_state.s v
+                   }
+                 )
+            | _ -> None
+          );
+        }
+    in state_builder.s init_state
+end
