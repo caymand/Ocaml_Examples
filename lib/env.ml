@@ -31,7 +31,8 @@ module Env : ENV =
       let open (val env_impl) in
       let env_builder =
         match_with comp init
-          { retc = (fun _ -> {e = fun _ -> empty () });
+          { retc =
+              (fun _ -> {e = fun _ -> empty () });
             exnc = raise;
             effc = (fun (type a) (eff : a Effect.t) ->
               match eff with
