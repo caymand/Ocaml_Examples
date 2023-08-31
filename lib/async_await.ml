@@ -56,7 +56,7 @@ module Scheduler : Scheduler = struct
                  List.iter (fun k -> continue k v) ks;
                  (* Now resume other threads *)
                  dequeue ();
-              | _ -> failwith "Should not happen"
+              | _ -> failwith "Promise already resolved."
               end
             );
           exnc = (fun e -> print_endline "FAILED"; raise e);
