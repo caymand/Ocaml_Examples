@@ -12,8 +12,9 @@ let main () =
     let expr = (string_of_int x) ^ " + 2 = " ^ (string_of_int y) in
     let _ = S.put ["foo"] in    (* ignored *)
     let _ = S.put [expr] in
-    let s = S.get () in
-    let s' = ["Doing comp:\n"] <> s in
-    let _ = S.put s' in
+    let _ = S.modify @@ (fun s -> ["Doing comp\n"] <> s) in
+    (* let s = S.get () in *)
+    (* let s' = ["Doing comp:\n"] <> s in *)
+    (* let _ = S.put s' in *)
     y in
   S.withState list_monoid [] comp 40

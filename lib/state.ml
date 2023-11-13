@@ -5,7 +5,8 @@ module type STATE =
     type t = M.t
     val withState : t monoid -> t -> ('a -> 'b) -> 'a -> 'b * t
     val get : unit -> t
-    val put : t -> unit                     
+    val put : t -> unit
+    val modify : (t -> t) -> unit
   end
 
 module State : STATE =
@@ -24,6 +25,9 @@ module State : STATE =
 
   let put v = perform (Put v)
   let get () = perform Get
+  let modify (f: t -> t) =
+    let s = get () in
+    put (f s)
   
   let withState (state_mod: t monoid) (init_state : t) (comp : 'a -> 'b) (a : 'a) =
     let state_builder =
